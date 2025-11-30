@@ -1,0 +1,154 @@
+<script setup>
+import { ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { authService } from '@/services/authService'
+import pbImage from "@/assets/purplebug.png";
+import emailIcon from "@/assets/email-icon.png";
+import lockIcon from "@/assets/lock-icon.png";
+import SuccessToast from '@/components/NotificationsBadge/SuccessToast.vue'
+import ErrorToast from '@/components/NotificationsBadge/ErrorToast.vue'
+
+const router = useRouter()
+
+const formData = ref({
+  email: '',
+  password: ''
+})
+
+const error = ref('')
+const success = ref('')
+const loading = ref(false)
+const needsVerification = ref(false)
+const resendLoading = ref(false)
+
+const handleSubmit = async () => {
+  error.value = ''
+  success.value = ''
+  needsVerification.value = false
+  loading.value = true
+
+  try {
+    const response = await authService.login({
+      email: formData.value.email,
+      password: formData.value.password
+    })
+    
+    success.value = 'Login successful! Redirecting...'
+    
+    setTimeout(() => {
+      // Check if user is admin and redirect accordingly
+      if (authService.isAdmin()) {
+        router.push('/admin/products')
+      } else {
+        router.push('/')
+      }
+    }, 1500)
+  } catch (err) {
+    // Check if user needs to verify email
+    if (err.response?.data?.needs_verification) {
+      needsVerification.value = true
+      error.value = 'Please verify your email address before logging in.'
+    } else if (err.response?.data?.errors) {
+      const errors = err.response.data.errors
+      error.value = Object.values(errors).flat().join(' ')
+    } else if (err.response?.data?.message) {
+      error.value = err.response.data.message
+    } else {
+      error.value = 'Invalid email or password. Please try again.'
+    }
+    console.error('Login error:', err.response?.data || err)
+  } finally {
+    loading.value = false
+  }
+}
+
+const resendVerification = async () => {
+  resendLoading.value = true
+  error.value = ''
+  
+  try {
+    await authService.resendVerification(formData.value.email)
+    success.value = 'Verification email sent! Please check your inbox.'
+    needsVerification.value = false
+  } catch (err) {
+    error.value = err.response?.data?.message || 'Failed to resend verification email.'
+  } finally {
+    resendLoading.value = false
+  }
+}
+</script>
+
+<template>
+  <main class="flex flex-col items-center justify-center min-h-screen p-6">
+    <div class="mb-12">
+      <router-link to="/">
+        <img :src="pbImage" alt="PurpleBug Logo" class="h-12 cursor-pointer hover:opacity-80 transition" />
+      </router-link>
+    </div>
+    <div class="w-full max-w-md">
+      <form @submit.prevent="handleSubmit" class="flex flex-col gap-4">
+        <SuccessToast v-if="success" :message="success" />
+        
+        <ErrorToast v-if="error" :message="error" />
+
+        <!-- Resend verification button -->
+        <div v-if="needsVerification" class="text-center">
+          <button
+            type="button"
+            @click="resendVerification"
+            :disabled="resendLoading"
+            class="text-pbpurple hover:underline disabled:opacity-50 cursor-pointer"
+          >
+            {{ resendLoading ? 'Sending...' : 'Resend verification email' }}
+          </button>
+        </div>
+
+        <div class="flex flex-col">
+          <label for="email" class="mb-2 font-medium">Email</label>
+          <div class="relative">
+            <img
+              :src="emailIcon"
+              alt="Email"
+              class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5"
+            />
+            <input
+              v-model="formData.email"
+              type="email"
+              id="email"
+              name="email"
+              placeholder="Enter Email"
+              required
+              class="border border-gray-300 rounded-lg pl-12 pr-4 py-2 w-full"
+            />
+          </div>
+        </div>
+        <div class="flex flex-col">
+          <label for="password" class="mb-2 font-medium">Password</label>
+          <div class="relative">
+            <img
+              :src="lockIcon"
+              alt="Lock"
+              class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5"
+            />
+            <input
+              v-model="formData.password"
+              type="password"
+              placeholder="Enter Password"
+              id="password"
+              name="password"
+              required
+              class="border border-gray-300 rounded-lg pl-12 pr-4 py-2 w-full"
+            />
+          </div>
+        </div>
+        <button
+          type="submit"
+          :disabled="loading"
+          class="bg-pbpurple hover:cursor-pointer text-white py-2 px-4 rounded-lg hover:opacity-90 transition font-medium mt-2 w-36 self-center disabled:opacity-50"
+        >
+          {{ loading ? 'LOADING...' : 'LOGIN' }}
+        </button>
+      </form>
+    </div>
+  </main>
+</template>

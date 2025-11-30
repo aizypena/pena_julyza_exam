@@ -1,0 +1,20 @@
+<script setup>
+import { RouterView } from 'vue-router'
+</script>
+
+<template>
+  <RouterView />
+</template>
+
+<style>
+html, body {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+#app {
+  width: 100%;
+  min-height: 100vh;
+}
+</style>
